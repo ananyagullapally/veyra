@@ -4,7 +4,10 @@ import pandas as pd
 
 
 RAW_DATA_PATH = Path("data/raw/Base.csv")
+PROCESSED_DATA_DIR = Path("data/processed")
 
+APPLICATIONS_PATH = PROCESSED_DATA_DIR / "applications.parquet"
+LABELS_PATH = PROCESSED_DATA_DIR / "labels.parquet"
 
 REQUIRED_COLUMNS = {
     "fraud_bool",
@@ -93,12 +96,67 @@ def main():
     
     df = remove_constant_features(df)
 
-    print("\nFinal preprocessing check:")
-    print(f"Columns: {len(df.columns)}")
-    print(
-        f"device_fraud_count present: "
-        f"{'device_fraud_count' in df.columns}"
+    train_df, validation_df, test_df = split_temporally(df)
+
+    train_df, validation_df, test_df = add_split_column(
+        train_df,
+        validation_df,
+        test_df,
     )
+
+    train_applications, train_labels = separate_features_and_labels(train_df)
+
+    validation_applications, validation_labels = separate_features_and_labels(
+        validation_df
+    )
+
+    test_applications, test_labels = separate_features_and_labels(test_df)
+
+    applications_df = pd.concat(
+        [
+            train_applications,
+            validation_applications,
+            test_applications,
+        ],
+        ignore_index=True,
+    )
+
+    labels_df = pd.concat(
+        [
+            train_labels,
+            validation_labels,
+            test_labels,
+        ],
+        ignore_index=True,
+    )
+
+    save_processed_data(applications_df, labels_df)
+    validate_saved_data()
+
+def validate_saved_data() -> None:
+    """Read processed files back and verify their basic integrity."""
+
+    applications_df = pd.read_parquet(APPLICATIONS_PATH)
+    labels_df = pd.read_parquet(LABELS_PATH)
+
+    print("\nSaved data validation:")
+    print(f"Applications: {len(applications_df):,} rows")
+    print(f"Labels:       {len(labels_df):,} rows")
+
+    print(
+        f"fraud_bool in applications: "
+        f"{'fraud_bool' in applications_df.columns}"
+    )
+    print(
+        f"fraud_bool in labels: "
+        f"{'fraud_bool' in labels_df.columns}"
+    )
+
+    print("\nApplication splits:")
+    print(applications_df["dataset_split"].value_counts())
+
+    print("\nLabel splits:")
+    print(labels_df["dataset_split"].value_counts())
 
 def add_application_ids(df: pd.DataFrame) -> pd.DataFrame:
     """Assign a stable unique identifier to every application."""
@@ -164,6 +222,79 @@ def remove_constant_features(df: pd.DataFrame) -> pd.DataFrame:
         print("No constant features detected.")
 
     return df
+
+def split_temporally(
+    df: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Split applications chronologically using the BAF month field."""
+
+    train_df = df[df["month"].between(0, 5)].copy()
+    validation_df = df[df["month"] == 6].copy()
+    test_df = df[df["month"] == 7].copy()
+
+    print("\nTemporal split created:")
+    print(f"Train:      {len(train_df):,} applications")
+    print(f"Validation: {len(validation_df):,} applications")
+    print(f"Test:       {len(test_df):,} applications")
+
+    return train_df, validation_df, test_df
+
+def add_split_column(
+    train_df: pd.DataFrame,
+    validation_df: pd.DataFrame,
+    test_df: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Label each application with its dataset split."""
+
+    train_df = train_df.copy()
+    validation_df = validation_df.copy()
+    test_df = test_df.copy()
+
+    train_df["dataset_split"] = "train"
+    validation_df["dataset_split"] = "validation"
+    test_df["dataset_split"] = "test"
+
+    return train_df, validation_df, test_df
+
+def separate_features_and_labels(
+    df: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Separate application data from the fraud label."""
+
+    label_columns = [
+        "application_id",
+        "fraud_bool",
+        "month",
+        "dataset_split",
+    ]
+
+    labels_df = df[label_columns].copy()
+
+    applications_df = df.drop(columns=["fraud_bool"]).copy()
+
+    return applications_df, labels_df
+
+def save_processed_data(
+    applications_df: pd.DataFrame,
+    labels_df: pd.DataFrame,
+) -> None:
+    """Save prepared application data and fraud labels as Parquet files."""
+
+    PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    applications_df.to_parquet(
+        APPLICATIONS_PATH,
+        index=False,
+    )
+
+    labels_df.to_parquet(
+        LABELS_PATH,
+        index=False,
+    )
+
+    print("\nProcessed data saved:")
+    print(f"Applications: {APPLICATIONS_PATH}")
+    print(f"Labels:       {LABELS_PATH}")
 
 if __name__ == "__main__":
     main()
