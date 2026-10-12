@@ -33,3 +33,7 @@ mlruns/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# MLflow local tracking
+mlflow.db
+mlartifacts/

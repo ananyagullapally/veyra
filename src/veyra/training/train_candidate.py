@@ -1,3 +1,7 @@
+import mlflow
+import mlflow.sklearn
+
+from veyra.training.mlflow_setup import configure_mlflow
 from sklearn.metrics import (
     average_precision_score,
     confusion_matrix,
@@ -186,6 +190,31 @@ def main():
         f"TP: {test_tp:,} | FP: {test_fp:,} | "
         f"FN: {test_fn:,} | TN: {test_tn:,}"
     )
+
+    configure_mlflow()
+
+    with mlflow.start_run(run_name="xgboost-depth3-final"):
+        mlflow.log_params({
+            "model_type": "XGBoost",
+            "max_depth": 3,
+        })
+
+        mlflow.log_metrics({
+            "test_pr_auc": test_pr_auc,
+            "test_roc_auc": test_roc_auc,
+        })
+
+        mlflow.sklearn.log_model(
+        sk_model=pipeline,
+        name="fraud_pipeline",
+        skops_trusted_types=[
+            "numpy.dtype",
+            "xgboost.core.Booster",
+            "xgboost.sklearn.XGBClassifier",
+        ],
+    )
+
+    print("\nModel and metrics logged to MLflow!")
 
 if __name__ == "__main__":
     main()
