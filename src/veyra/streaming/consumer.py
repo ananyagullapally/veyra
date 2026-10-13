@@ -1,14 +1,109 @@
-
 import json
-
-import httpx
+import time
 from confluent_kafka import Consumer, Producer, KafkaException
-
+from veyra.streaming.recovery import score_with_recovery
+from veyra.streaming.dlq import publish_to_dlq
+from veyra.streaming.errors import PermanentProcessingError
+from veyra.streaming.errors import TransientProcessingError
 
 KAFKA_BOOTSTRAP_SERVERS = "127.0.0.1:9092"
 APPLICATION_TOPIC = "veyra.applications"
 PREDICTION_TOPIC = "veyra.predictions"
-API_URL = "http://127.0.0.1:8000/predict"
+
+
+def parse_application_event(raw_value: bytes) -> dict | None:
+    try:
+        event = json.loads(raw_value.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+
+    if not isinstance(event, dict):
+        return None
+
+    if "features" not in event or not isinstance(event["features"], dict):
+        return None
+
+    return event
+
+
+def publish_prediction(producer, application_id, prediction):
+    prediction_event = {
+        "application_id": application_id,
+        **prediction,
+    }
+
+    delivery_errors = []
+
+    def delivery_report(error, delivered_message):
+        if error is not None:
+            delivery_errors.append(str(error))
+
+    producer.produce(
+        topic=PREDICTION_TOPIC,
+        key=str(application_id),
+        value=json.dumps(prediction_event).encode("utf-8"),
+        callback=delivery_report,
+    )
+
+    remaining = producer.flush(timeout=10.0)
+
+    if remaining > 0 or delivery_errors:
+        raise RuntimeError(
+            f"Prediction delivery failed: {delivery_errors}"
+        )
+
+    return prediction_event
+
+
+def process_application_message(message, consumer, producer):
+    event = parse_application_event(message.value())
+
+    if event is None:
+        raw_payload = message.value()
+        application_id = (
+            message.key().decode("utf-8", errors="replace")
+            if message.key() is not None
+            else f"{message.topic()}-{message.partition()}-{message.offset()}"
+        )
+
+        publish_to_dlq(
+            producer=producer,
+            application_id=application_id,
+            original_payload={
+                "raw_message": raw_payload.decode("utf-8", errors="replace")
+            },
+            error=ValueError("Invalid application event"),
+            attempt_count=1,
+        )
+
+        consumer.commit(message=message, asynchronous=False)
+        return "dlq"
+
+    application_id = event.get("application_id")
+
+    try:
+        prediction = score_with_recovery(event["features"])
+
+    except PermanentProcessingError as error:
+        publish_to_dlq(
+            producer=producer,
+            application_id=application_id,
+            original_payload=event,
+            error=error,
+            attempt_count=1,
+        )
+
+        consumer.commit(message=message, asynchronous=False)
+        return "dlq"
+
+    publish_prediction(
+        producer=producer,
+        application_id=application_id,
+        prediction=prediction,
+    )
+
+    consumer.commit(message=message, asynchronous=False)
+    return "predicted"
 
 
 def main():
@@ -21,6 +116,8 @@ def main():
 
     prediction_producer = Producer({
         "bootstrap.servers": KAFKA_BOOTSTRAP_SERVERS,
+        "acks": "all",
+        "enable.idempotence": True,
     })
 
     consumer.subscribe([APPLICATION_TOPIC])
@@ -36,81 +133,19 @@ def main():
             if message.error():
                 raise KafkaException(message.error())
 
-            event = parse_application_event(message.value())
-
-            if event is None:
-                print("Invalid application event. Skipping.")
-                consumer.commit(message=message, asynchronous=False)
-                continue
-
-            application_id = event.get("application_id")
-            print("\nReceived application:", application_id)
-
-            # 1. Score the application using FastAPI
-            response = httpx.post(
-                API_URL,
-                json={"features": event["features"]},
-                timeout=10.0,
-            )
-            response.raise_for_status()
-
-            prediction = response.json()
-            print("Fraud prediction:", prediction)
-
-            # 2. Build the prediction event
-            prediction_event = {
-                "application_id": application_id,
-                **prediction,
-            }
-
-            # 3. Publish the prediction to Kafka
-            delivery_errors = []
-
-            def delivery_report(error, delivered_message):
-                if error is not None:
-                    delivery_errors.append(str(error))
-
-            prediction_producer.produce(
-                topic=PREDICTION_TOPIC,
-                key=str(application_id),
-                value=json.dumps(prediction_event).encode("utf-8"),
-                callback=delivery_report,
-            )
-
-            remaining = prediction_producer.flush(timeout=10.0)
-
-            if remaining > 0 or delivery_errors:
-                raise RuntimeError(
-                    f"Prediction delivery failed: {delivery_errors}"
-                )
-
-            print("Prediction published to Kafka")
-
-            # 4. Commit only after successful publication
-            consumer.commit(
+            result = process_application_message(
                 message=message,
-                asynchronous=False,
+                consumer=consumer,
+                producer=prediction_producer,
             )
+
+            print(f"Application processing result: {result}")
 
     except KeyboardInterrupt:
         print("\nStopping Veyra consumer...")
 
     finally:
         consumer.close()
-
-def parse_application_event(raw_value: bytes) -> dict | None:
-    try:
-        event = json.loads(raw_value.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        return None
-
-    if not isinstance(event, dict):
-        return None
-
-    if "features" not in event or not isinstance(event["features"], dict):
-        return None
-
-    return event
 
 
 if __name__ == "__main__":
