@@ -13,7 +13,7 @@ def main():
     # Use one validation application for a local replay test
     sample = applications[
     applications["dataset_split"] == "validation"
-    ].iloc[0]
+    ].iloc[1]
 
     event = {
         "application_id": str(sample["application_id"]),
@@ -68,9 +68,6 @@ def main():
         print("Fraud prediction:", prediction)
     else:
         print("No features provided. Skipping scoring.")
-
-
-
 
 if __name__ == "__main__":
     main()

@@ -1,8 +1,9 @@
+
 services:
   kafka:
     image: apache/kafka:3.9.1
     container_name: veyra-kafka
-  
+
     ports:
       - "127.0.0.1:9092:9092"
 
@@ -27,5 +28,27 @@ services:
     volumes:
       - kafka_data:/var/lib/kafka/data
 
+  postgres:
+    image: postgres:16
+    container_name: veyra-postgres
+
+    ports:
+      - "127.0.0.1:5432:5432"
+
+    environment:
+      POSTGRES_USER: veyra
+      POSTGRES_PASSWORD: ${VEYRA_DB_PASSWORD}
+      POSTGRES_DB: veyra
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U veyra -d veyra"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
 volumes:
   kafka_data:
+  postgres_data:

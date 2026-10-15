@@ -1,0 +1,13 @@
+import os
+import psycopg
+
+
+def get_connection():
+    return psycopg.connect(
+        host=os.getenv("VEYRA_DB_HOST", "127.0.0.1"),
+        port=int(os.getenv("VEYRA_DB_PORT", "5432")),
+        dbname=os.getenv("VEYRA_DB_NAME", "veyra"),
+        user=os.getenv("VEYRA_DB_USER", "veyra"),
+        password=os.environ["VEYRA_DB_PASSWORD"],
+        connect_timeout=5,
+    )
