@@ -1,7 +1,9 @@
 import os
 import psycopg
-
-
+from pathlib import Path
+from dotenv import load_dotenv
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+load_dotenv(PROJECT_ROOT / ".env")
 def get_connection():
     return psycopg.connect(
         host=os.getenv("VEYRA_DB_HOST", "127.0.0.1"),

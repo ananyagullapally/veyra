@@ -5,7 +5,7 @@ import os
 
 from kafka import KafkaConsumer
 
-from veyra.storage.predictions import save_prediction
+from veyra.storage.retry import save_prediction_with_retry
 
 
 logging.basicConfig(level=logging.INFO)
@@ -30,7 +30,7 @@ def run_storage_consumer():
         for message in consumer:
             try:
                 prediction = json.loads(message.value.decode("utf-8"))
-                save_prediction(prediction)
+                save_prediction_with_retry(prediction)
 
                 # Commit only after PostgreSQL successfully commits.
                 consumer.commit()

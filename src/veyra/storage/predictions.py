@@ -1,9 +1,21 @@
-
 from veyra.storage.database import get_connection
 
 
+VALID_SOURCES = {
+    "unknown",
+    "production",
+    "pipeline_test",
+    "synthetic_test",
+}
+
+
 def save_prediction(prediction: dict) -> None:
-    """Insert or update a fraud prediction by application ID."""
+    """Store a prediction without overwriting an existing application."""
+
+    source = prediction.get("source", "unknown")
+
+    if source not in VALID_SOURCES:
+        raise ValueError(f"Invalid prediction source: {source}")
 
     query = """
         INSERT INTO fraud_predictions (
@@ -12,7 +24,8 @@ def save_prediction(prediction: dict) -> None:
             decision,
             threshold,
             model,
-            alias
+            alias,
+            source
         )
         VALUES (
             %(application_id)s,
@@ -20,18 +33,18 @@ def save_prediction(prediction: dict) -> None:
             %(decision)s,
             %(threshold)s,
             %(model)s,
-            %(alias)s
+            %(alias)s,
+            %(source)s
         )
         ON CONFLICT (application_id)
-        DO UPDATE SET
-            fraud_probability = EXCLUDED.fraud_probability,
-            decision = EXCLUDED.decision,
-            threshold = EXCLUDED.threshold,
-            model = EXCLUDED.model,
-            alias = EXCLUDED.alias,
-            updated_at = NOW();
+        DO NOTHING;
     """
+
+    parameters = {
+        **prediction,
+        "source": source,
+    }
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
-            cursor.execute(query, prediction)
+            cursor.execute(query, parameters)

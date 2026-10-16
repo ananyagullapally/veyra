@@ -16,8 +16,9 @@ def main():
     ].iloc[1]
 
     event = {
-        "application_id": str(sample["application_id"]),
-        "features": {},
+    "application_id": "source-test-002",
+    "source": "pipeline_test",
+    "features": {},
     }
 
     excluded = {

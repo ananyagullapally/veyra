@@ -26,10 +26,11 @@ def parse_application_event(raw_value: bytes) -> dict | None:
     return event
 
 
-def publish_prediction(producer, application_id, prediction):
+def publish_prediction(producer, application_id, prediction, source="unknown"):
     prediction_event = {
         "application_id": application_id,
         **prediction,
+        "source": source,
     }
 
     delivery_errors = []
@@ -100,6 +101,7 @@ def process_application_message(message, consumer, producer):
         producer=producer,
         application_id=application_id,
         prediction=prediction,
+        source=event.get("source", "unknown"),
     )
 
     consumer.commit(message=message, asynchronous=False)
