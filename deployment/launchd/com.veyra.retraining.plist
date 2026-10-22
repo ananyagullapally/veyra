@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+"http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.veyra.retraining</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/ananyagullapally/anaconda3/envs/veyra/bin/python</string>
+        <string>-m</string>
+        <string>veyra.orchestration.retraining_scheduler</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/ananyagullapally/Documents/veyra</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>VEYRA_RETRAINING_ENABLED</key>
+        <string>false</string>
+    </dict>
+
+    <key>StartInterval</key>
+    <integer>86400</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/ananyagullapally/Documents/veyra/logs/retraining.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/ananyagullapally/Documents/veyra/logs/retraining_error.log</string>
+</dict>
+</plist>

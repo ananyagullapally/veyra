@@ -129,79 +129,21 @@ def main():
         f"FN: {fn:,} | TN: {tn:,}"
     )
 
-    # Final evaluation on untouched Month 7 test data
-    test_df = load_split_data("test")
-    X_test, y_test = create_feature_target_split(test_df)
-
-    test_probabilities = pipeline.predict_proba(
-        X_test
-    )[:, 1]
-
-    # IMPORTANT:
-    # Use the threshold selected on validation.
-    # Do not select a new threshold using test data.
-    test_predictions = (
-        test_probabilities >= threshold
-    ).astype(int)
-
-    test_pr_auc = average_precision_score(
-        y_test,
-        test_probabilities,
-    )
-
-    test_roc_auc = roc_auc_score(
-        y_test,
-        test_probabilities,
-    )
-
-    test_precision = precision_score(
-        y_test,
-        test_predictions,
-        zero_division=0,
-    )
-
-    test_recall = recall_score(
-        y_test,
-        test_predictions,
-        zero_division=0,
-    )
-
-    test_f1 = f1_score(
-        y_test,
-        test_predictions,
-        zero_division=0,
-    )
-
-    test_tn, test_fp, test_fn, test_tp = confusion_matrix(
-        y_test,
-        test_predictions,
-    ).ravel()
-
-    print("\nFinal Month 7 test results:")
-    print(f"PR-AUC:    {test_pr_auc:.4f}")
-    print(f"ROC-AUC:   {test_roc_auc:.4f}")
-    print(f"Threshold: {threshold:.4f}")
-    print(f"Precision: {test_precision:.4f}")
-    print(f"Recall:    {test_recall:.4f}")
-    print(f"F1:        {test_f1:.4f}")
-
-    print("\nTest confusion matrix:")
-    print(
-        f"TP: {test_tp:,} | FP: {test_fp:,} | "
-        f"FN: {test_fn:,} | TN: {test_tn:,}"
-    )
-
     configure_mlflow()
 
-    with mlflow.start_run(run_name="xgboost-depth3-final"):
+    with mlflow.start_run(run_name="xgboost-candidate") as run:
         mlflow.log_params({
             "model_type": "XGBoost",
             "max_depth": 3,
+            "selected_threshold": float(threshold),
         })
 
         mlflow.log_metrics({
-            "test_pr_auc": test_pr_auc,
-            "test_roc_auc": test_roc_auc,
+            "validation_pr_auc": pr_auc,
+            "validation_roc_auc": roc_auc,
+            "validation_precision": precision,
+            "validation_recall": recall,
+            "validation_f1": f1,
         })
 
         mlflow.sklearn.log_model(
@@ -215,6 +157,7 @@ def main():
     )
 
     print("\nModel and metrics logged to MLflow!")
+    return run.info.run_id
 
 if __name__ == "__main__":
     main()

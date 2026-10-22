@@ -37,3 +37,7 @@ mlruns/
 # MLflow local tracking
 mlflow.db
 mlartifacts/
+
+# Runtime logs
+logs/
+*.log
