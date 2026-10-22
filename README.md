@@ -38,34 +38,40 @@ See [Retraining Documentation](docs/automated_retraining.md) and [Scheduler Setu
 Banking Application
         |
         v
-Apache Kafka (veyra.applications)
+Kafka: veyra.applications
         |
         v
 Fraud Scoring Consumer
         |
-        +----> MLflow Champion Model
+        v
+MLflow Champion Model
         |
-        +----> PostgreSQL Prediction Storage
+        v
+Kafka: veyra.predictions
         |
-        +----> Kafka Predictions Topic
-                     |
-                     v
-              PSI Drift Monitoring
-                     |
-                     v
-              Retraining Trigger
-                     |
-                     v
-              PostgreSQL Lock + Cooldown
-                     |
-                     v
-              XGBoost Candidate Training
-                     |
-                     v
-              MLflow Candidate Evaluation
-                     |
-                     v
-              Dry-Run Promotion Decision
+        v
+Prediction Storage Consumer
+        |
+        v
+PostgreSQL: fraud_predictions
+        |
+        v
+PSI Drift Monitoring
+        |
+        v
+Retraining Trigger
+        |
+        v
+PostgreSQL Lock + Cooldown
+        |
+        v
+XGBoost Candidate Training
+        |
+        v
+MLflow Candidate Evaluation
+        |
+        v
+Dry-Run Promotion Decision
 ```
 
 FastAPI provides `/health` and `/predict` endpoints for synchronous fraud scoring.
@@ -101,6 +107,40 @@ pip install -e .
 
 Configure environment variables using `.env.example` as a reference.
 
+### Start Local Infrastructure
+
+Start Kafka and PostgreSQL:
+
+    docker compose up -d
+
+Start MLflow from the project root in a separate terminal:
+
+    mlflow server --backend-store-uri sqlite:///mlflow.db --artifacts-destination ./mlartifacts --host 127.0.0.1 --port 5000
+
+MLflow UI: http://127.0.0.1:5000
+
+Kafka topics must be created explicitly because automatic topic creation is disabled.
+
+### Start Fraud Scoring Services
+
+Start each service in a separate terminal after Kafka, PostgreSQL, and MLflow are running.
+
+**FastAPI:**
+
+    uvicorn veyra.serving.api:app --host 127.0.0.1 --port 8000
+
+**Kafka scoring consumer:**
+
+    python -m veyra.streaming.consumer
+
+**Kafka prediction storage consumer:**
+
+    python -u -m veyra.storage.consumer
+
+**API health check:**
+
+    curl http://127.0.0.1:8000/health
+
 ### Run Tests
 
 ```bash
@@ -109,7 +149,7 @@ python -m pytest tests/ -q
 
 Latest verified test results:
 
-- 140 passed
+- 142 passed
 - 3 skipped
 - 219 warnings
 
