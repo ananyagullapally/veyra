@@ -115,9 +115,9 @@ Start Kafka and PostgreSQL:
 
 Start MLflow from the project root in a separate terminal:
 
-    mlflow server --backend-store-uri sqlite:///mlflow.db --artifacts-destination ./mlartifacts --host 127.0.0.1 --port 5000
+    mlflow server --backend-store-uri sqlite:///mlflow.db --artifacts-destination ./mlartifacts --host 127.0.0.1 --port 5001
 
-MLflow UI: http://127.0.0.1:5000
+MLflow UI: http://127.0.0.1:5001
 
 Kafka topics must be created explicitly because automatic topic creation is disabled.
 
