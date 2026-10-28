@@ -196,3 +196,7 @@ Candidate models are evaluated against the registered MLflow champion.
 
 Promotion decisions are dry-run only. Veyra does not automatically
 replace the production champion.
+
+## Portfolio Case Study
+
+Read the [Veyra Portfolio Case Study](docs/portfolio_case_study.md) for the problem statement, dataset selection, technical architecture, engineering challenges, and verified outcomes.
