@@ -1,5 +1,6 @@
 
 import json
+from uuid import uuid4
 import httpx
 import pandas as pd
 from confluent_kafka import Producer
@@ -16,7 +17,7 @@ def main():
     ].iloc[1]
 
     event = {
-    "application_id": "source-test-002",
+    "application_id": f"demo-{uuid4().hex[:12]}",
     "source": "pipeline_test",
     "features": {},
     }
