@@ -78,6 +78,20 @@ FastAPI provides `/health` and `/predict` endpoints for synchronous fraud scorin
 
 Automated retraining is disabled by default. Candidate promotion does not modify the production champion.
 
+## Dataset & Model Evaluation
+
+Veyra uses the Bank Account Fraud (BAF) dataset, containing 1 million privacy-preserving synthetic bank account applications. BAF was selected over simpler synthetic datasets because it provides application-specific banking, customer, and device signals, realistic class imbalance, and a temporal structure suitable for evaluating fraud detection.
+
+The preprocessing pipeline handles missing-value sentinels, validates feature schemas, and removes constant features.
+
+Data is split chronologically:
+
+- Training: 794,989 applications
+- Validation: 108,168 applications
+- Testing: 96,843 applications
+
+An XGBoost classifier produces fraud probabilities, with a configurable decision threshold. MLflow tracks experiments and manages the registered champion model.
+
 ## Local Development
 
 ### Prerequisites
@@ -119,7 +133,19 @@ Start MLflow from the project root in a separate terminal:
 
 MLflow UI: http://127.0.0.1:5001
 
+Veyra defaults to MLflow at port 5001. To use another tracking server, set `MLFLOW_TRACKING_URI` before starting FastAPI or the scoring consumer, for example: `export MLFLOW_TRACKING_URI=http://127.0.0.1:5001`.
+
 Kafka topics must be created explicitly because automatic topic creation is disabled.
+
+Create the required topics after starting Docker Compose:
+
+```bash
+for topic in veyra.applications veyra.predictions veyra.applications.dlq; do
+  docker exec veyra-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic "$topic" --partitions 1 --replication-factor 1
+done
+```
+
+These settings are intended for local development with a single Kafka broker.
 
 ### Start Fraud Scoring Services
 
