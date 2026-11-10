@@ -9,13 +9,32 @@ import numpy as np
 from veyra.serving.api import app
 
 
+
 @pytest.fixture(scope="module")
 def client():
-    # Starts FastAPI and loads the MLflow champion model
-    with TestClient(app) as test_client:
-        yield test_client
+    from unittest.mock import MagicMock, patch
 
+    from veyra.training.load_training_data import (
+        load_split_data,
+        create_feature_target_split,
+    )
 
+    validation_df = load_split_data("validation")
+    X_validation, _ = create_feature_target_split(validation_df)
+
+    mock_pipeline = MagicMock()
+    mock_pipeline.feature_names_in_ = X_validation.columns.to_numpy()
+
+    def validate_features(row):
+        if not pd.api.types.is_numeric_dtype(row["income"]):
+            raise ValueError("Invalid numeric feature: income")
+        return np.array([[0.9, 0.1]])
+
+    mock_pipeline.predict_proba.side_effect = validate_features
+
+    with patch("veyra.serving.api.load_champion", return_value=(mock_pipeline, 0.013208)):
+        with TestClient(app) as test_client:
+            yield test_client
 def test_health_endpoint(client):
     response = client.get("/health")
 
