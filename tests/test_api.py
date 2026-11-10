@@ -19,8 +19,7 @@ def client():
         create_feature_target_split,
     )
 
-    validation_df = load_split_data("validation")
-    X_validation, _ = create_feature_target_split(validation_df)
+    X_validation = pd.DataFrame(columns=["income", "customer_age", "credit_risk_score"])
 
     mock_pipeline = MagicMock()
     mock_pipeline.feature_names_in_ = X_validation.columns.to_numpy()
@@ -82,11 +81,10 @@ def test_predict_rejects_missing_request_body(client):
     assert response.status_code == 422
 
 def test_predict_rejects_invalid_numeric_value(client):
-    validation_df = load_split_data("validation")
-    X_validation, _ = create_feature_target_split(validation_df)
+    X_validation = pd.DataFrame(columns=["income", "customer_age", "credit_risk_score"])
 
     # Select one validation application
-    features = X_validation.iloc[0].to_dict()
+    features = {"income": 0.5, "customer_age": 35, "credit_risk_score": 120}
 
     # Convert missing values to JSON null
     features = {
