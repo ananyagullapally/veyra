@@ -34,44 +34,34 @@ See [Retraining Documentation](docs/automated_retraining.md) and [Scheduler Setu
 
 ## System Architecture
 
-```text
-Banking Application
-        |
-        v
-Kafka: veyra.applications
-        |
-        v
-Fraud Scoring Consumer
-        |
-        v
-MLflow Champion Model
-        |
-        v
-Kafka: veyra.predictions
-        |
-        v
-Prediction Storage Consumer
-        |
-        v
-PostgreSQL: fraud_predictions
-        |
-        v
-PSI Drift Monitoring
-        |
-        v
-Retraining Trigger
-        |
-        v
-PostgreSQL Lock + Cooldown
-        |
-        v
-XGBoost Candidate Training
-        |
-        v
-MLflow Candidate Evaluation
-        |
-        v
-Dry-Run Promotion Decision
+```mermaid
+flowchart TD
+    A["Banking Application"] --> B["Kafka: Applications"]
+    B --> C["Fraud Scoring Consumer"]
+    C -->|"HTTP POST"| D["FastAPI /predict"]
+    R["MLflow Model Registry"] -->|"Champion model"| E["XGBoost Inference"]
+    E --- D
+    D -->|"Prediction response"| C
+    C --> F["Kafka: Predictions"]
+    F --> G["Prediction Storage Consumer"]
+    G --> H[("PostgreSQL: fraud_predictions")]
+
+    H --> I["PSI Drift Monitoring"]
+    I --> J{"Retraining enabled and triggered?"}
+    J -->|"Yes"| K["PostgreSQL Lock + Cooldown"]
+    K --> L["XGBoost Candidate Training"]
+    L --> M["MLflow Candidate Evaluation"]
+    M --> N["Dry-Run Promotion Decision"]
+
+    classDef kafka fill:#e0f2fe,stroke:#0284c7,color:#0f172a
+    classDef ml fill:#ede9fe,stroke:#7c3aed,color:#0f172a
+    classDef storage fill:#dcfce7,stroke:#16a34a,color:#0f172a
+    classDef safety fill:#fef3c7,stroke:#d97706,color:#0f172a
+
+    class B,F kafka
+    class D,E,R,L,M ml
+    class H storage
+    class J,K,N safety
 ```
 
 FastAPI provides `/health` and `/predict` endpoints for synchronous fraud scoring.
@@ -80,7 +70,7 @@ Automated retraining is disabled by default. Candidate promotion does not modify
 
 ## Dataset & Model Evaluation
 
-Veyra uses the Bank Account Fraud (BAF) dataset, containing 1 million privacy-preserving synthetic bank account applications. BAF was selected over simpler synthetic datasets because it provides application-specific banking, customer, and device signals, realistic class imbalance, and a temporal structure suitable for evaluating fraud detection.
+Veyra uses the Bank Account Fraud (BAF) dataset, containing 1 million privacy-preserving synthetic bank account applications. BAF provides application-specific banking, customer, and device signals, class imbalance, and temporal structure suitable for evaluating fraud detection.
 
 The preprocessing pipeline handles missing-value sentinels, validates feature schemas, and removes constant features.
 
@@ -90,7 +80,72 @@ Data is split chronologically:
 - Validation: 108,168 applications
 - Testing: 96,843 applications
 
-An XGBoost classifier produces fraud probabilities, with a configurable decision threshold. MLflow tracks experiments and manages the registered champion model.
+An XGBoost classifier produces fraud probabilities. MLflow tracks experiments and manages the registered champion model.
+
+### Champion Model Performance
+
+The registered XGBoost champion (version 1) was evaluated on the held-out test set using its existing decision threshold, without tuning on test data.
+
+| Metric | Validation | Held-out Test |
+|---|---:|---:|
+| PR-AUC | 0.1835 | 0.2207 |
+| ROC-AUC | 0.8935 | 0.8988 |
+| Fraud recall | 80.00% | 79.27% |
+| Precision | 5.94% | 6.98% |
+
+**Registered decision threshold:** `0.013208`
+
+**Threshold rationale:** The model uses a high-recall operating point aligned with an 80% validation-recall objective. This prioritizes identifying potentially fraudulent applications for further review rather than automatically rejecting them.
+
+**False-positive tradeoff:** At the registered threshold, test precision is 6.98%, indicating that many flagged applications are legitimate. This configuration is intended for fraud screening, not autonomous rejection.
+
+**Fixed-FPR analysis:** On the held-out test set, the maximum observed recall at a false-positive rate no greater than 1% was **27.59%** (observed FPR: 0.9998%). This is an evaluation operating point, not the registered deployment threshold.
+
+**Evaluation scope:** Results are measured on the synthetic BAF dataset and should not be interpreted as verified performance on live banking traffic.
+
+## API Latency Benchmark
+
+Veyra's FastAPI `/predict` endpoint was benchmarked locally with the registered XGBoost champion model loaded in memory.
+
+| Metric | Measured Latency |
+|---|---:|
+| Mean | 5.33 ms |
+| p50 | 5.00 ms |
+| p95 | 7.09 ms |
+| p99 | 10.10 ms |
+| Minimum | 4.28 ms |
+| Maximum | 23.38 ms |
+
+**Benchmark configuration:**
+- Hardware: MacBook Pro, Apple M1 Pro, 16 GB RAM
+- Operating system: macOS 26.6.2 (ARM64)
+- API: FastAPI/Uvicorn on localhost
+- Requests: 200 measured, following 20 warm-up requests
+- Concurrency: 1 (sequential HTTP POST requests)
+- Payload: One repeated, valid 33-feature application from the held-out BAF test split
+- Timing: Client-side end-to-end HTTP response latency, excluding model startup
+
+These measurements include HTTP request handling, feature validation, preprocessing, XGBoost inference, and response serialization.
+
+**Limitations:** Results reflect a local, single-client benchmark with a repeated synthetic application. They do not establish production latency, concurrent load capacity, or Kafka consumer throughput.
+
+## Kafka Scoring Throughput
+
+An isolated local benchmark measured Veyra's sequential Kafka scoring workflow, including HTTP inference through FastAPI, prediction publishing, and synchronous offset commits.
+
+| Metric | Result |
+|---|---:|
+| Successfully processed applications | 100 |
+| Processing time | 1.538 seconds |
+| Throughput | **65.02 events/second** |
+| Consumer concurrency | 1 |
+| Reported processing failures | 0 |
+
+**Environment:** MacBook Pro (Apple M1 Pro, 16 GB RAM), local Apache Kafka 3.9.1, FastAPI, and XGBoost champion v1.
+
+**Method:** A dedicated benchmark consumer group and separate input/output Kafka topics were used. The test processed 100 events containing a repeated synthetic BAF application payload. Timing began after input-event publication and ended after the final synchronous offset commit.
+
+**Limitations:** This is a single-run, local benchmark, not a sustained-load or production throughput measurement. The result does not include initial event publication, PostgreSQL persistence, or concurrent consumer scaling.
 
 ## Local Development
 
