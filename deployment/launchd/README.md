@@ -1,77 +1,25 @@
-# Veyra — Real-Time Fraud Detection & MLOps Platform
+# Veyra — macOS Retraining Scheduler
 
-Veyra is an end-to-end machine learning platform for detecting fraudulent banking applications using real-time event streaming, model serving, experiment tracking, production monitoring, and automated retraining orchestration.
+This directory contains the macOS launchd configuration for Veyra's automated retraining scheduler.
 
-## Technology Stack
+## Architecture
 
-- **Machine Learning:** Python, XGBoost, scikit-learn
-- **Experiment Tracking:** MLflow
-- **API:** FastAPI
-- **Event Streaming:** Apache Kafka
-- **Database:** PostgreSQL
-- **Monitoring:** Population Stability Index (PSI)
-- **Orchestration:** Python, PostgreSQL advisory locks, macOS launchd
-- **Testing:** pytest
+The real-time fraud scoring pipeline is:
 
-## Key Capabilities
+Banking Application → Kafka Applications → Scoring Consumer → FastAPI /predict → Kafka Predictions → Storage Consumer → PostgreSQL
 
-- Temporal data splitting to reduce data leakage
-- Fraud prediction through a FastAPI endpoint
-- Kafka-based application ingestion and prediction publishing
-- PostgreSQL persistence of prediction results
-- Production prediction drift monitoring
-- Automated candidate training and evaluation
-- Champion-versus-candidate model comparison
-- Dry-run promotion with safety controls
-- Drift-triggered retraining with concurrency protection and cooldown
+PostgreSQL prediction records are used for prediction-score PSI monitoring.
 
-## Automated Retraining
+When retraining is enabled and its trigger conditions are met, Veyra applies a PostgreSQL lock and cooldown before candidate training and evaluation.
 
-Veyra supports drift-triggered retraining orchestration, with a seven-day cooldown and PostgreSQL advisory locking.
+Model promotion is dry-run only. The registered MLflow champion is not automatically replaced.
 
-Retraining is disabled by default, and automatic champion promotion is not implemented.
+## Scheduler
 
-See [Automated Retraining Documentation](docs/automated_retraining.md) and [macOS Scheduler Setup](deployment/launchd/README.md).
+The `com.veyra.retraining.plist` file configures the macOS launchd scheduler.
 
-## System Architecture
+Automated retraining is disabled by default. The scheduler requires the appropriate local environment and services to be available.
 
-```text
-Banking Application
-        |
-        v
-Apache Kafka
-(veyra.applications)
-        |
-        v
-Fraud Scoring Consumer
-        |
-        +----> MLflow Champion Model
-        |             |
-        |             v
-        |       Fraud Probability
-        |             |
-        v             v
-PostgreSQL      Kafka Predictions
-        |
-        v
-PSI Drift Monitoring
-        |
-        v
-Retraining Trigger
-        |
-        v
-PostgreSQL Lock + Cooldown
-        |
-        v
-XGBoost Candidate Training
-        |
-        v
-MLflow Candidate Evaluation
-        |
-        v
-Dry-Run Promotion Decision
-```
+For configuration and safety details, see [Automated Retraining Documentation](../../docs/automated_retraining.md).
 
-The FastAPI service also provides `/health` and `/predict` endpoints for synchronous model serving.
-
-Automated retraining is disabled by default, and candidate promotion does not modify the production champion.
+For the complete system architecture, see the [Project README](../../README.md).

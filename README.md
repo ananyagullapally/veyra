@@ -1,4 +1,5 @@
 [![CI](https://github.com/ananyagullapally/veyra/actions/workflows/tests.yml/badge.svg)](https://github.com/ananyagullapally/veyra/actions/workflows/tests.yml)
+![Veyra System Architecture](docs/images/veyra-architecture.png)
 # Veyra — Real-Time Fraud Detection & MLOps Platform
 
 Veyra is an end-to-end fraud detection platform combining machine learning, real-time event streaming, model serving, monitoring, and retraining orchestration.
@@ -31,43 +32,48 @@ Retraining is disabled by default. When enabled, the scheduled workflow checks p
 
 Model promotion remains dry-run only.
 
-See [Retraining Documentation](docs/automated_retraining.md) and [Scheduler Setup](deployment/launchd/README.md).
+See [Automated Retraining Documentation](../../docs/automated_retraining.md).
+
 
 ## System Architecture
 
 ```mermaid
-flowchart TD
-    A["Banking Application"] --> B["Kafka: Applications"]
-    B --> C["Fraud Scoring Consumer"]
-    C -->|"HTTP POST"| D["FastAPI /predict"]
-    R["MLflow Model Registry"] -->|"Champion model"| E["XGBoost Inference"]
-    E --- D
-    D -->|"Prediction response"| C
-    C --> F["Kafka: Predictions"]
-    F --> G["Prediction Storage Consumer"]
-    G --> H[("PostgreSQL: fraud_predictions")]
 
-    H --> I["PSI Drift Monitoring"]
-    I --> J{"Retraining enabled and triggered?"}
-    J -->|"Yes"| K["PostgreSQL Lock + Cooldown"]
-    K --> L["XGBoost Candidate Training"]
-    L --> M["MLflow Candidate Evaluation"]
-    M --> N["Dry-Run Promotion Decision"]
+flowchart TB
+    subgraph SCORING["Real-Time Fraud Scoring"]
+        direction LR
+        A["Banking Application"] --> B["Kafka: veyra.applications"]
+        B --> C["Fraud Scoring Consumer"]
+        C -->|"HTTP request"| D["FastAPI /predict"]
+        D -->|"Prediction response"| C
+        C --> E["Kafka: veyra.predictions"]
+        E --> F["Prediction Storage Consumer"]
+        F --> G[("PostgreSQL")]
+    end
 
-    classDef kafka fill:#e0f2fe,stroke:#0284c7,color:#0f172a
-    classDef ml fill:#ede9fe,stroke:#7c3aed,color:#0f172a
-    classDef storage fill:#dcfce7,stroke:#16a34a,color:#0f172a
-    classDef safety fill:#fef3c7,stroke:#d97706,color:#0f172a
+    M["MLflow Registry: Champion XGBoost"] --> D
 
-    class B,F kafka
-    class D,E,R,L,M ml
-    class H storage
-    class J,K,N safety
+    G --> H["Prediction-Score PSI Monitoring"]
+    H --> I{"Drift detected and retraining enabled?"}
+    I -->|"Yes"| J["PostgreSQL Lock + Cooldown"]
+    J --> K["Train XGBoost Candidate"]
+    K --> L["MLflow Candidate Evaluation"]
+    L --> N["Dry-Run Promotion: No Auto-Swap"]
+
+    style SCORING fill:#f8fafc,stroke:#94a3b8
+    style B fill:#ede9fe,stroke:#8b5cf6
+    style E fill:#ede9fe,stroke:#8b5cf6
+    style G fill:#dcfce7,stroke:#16a34a
+    style M fill:#dbeafe,stroke:#3b82f6
+    style N fill:#fef3c7,stroke:#d97706
+
 ```
 
-FastAPI provides `/health` and `/predict` endpoints for synchronous fraud scoring.
+The scoring consumer publishes prediction events to Kafka. A separate storage consumer reads those events and persists them to PostgreSQL.
 
-Automated retraining is disabled by default. Candidate promotion does not modify the production champion.
+FastAPI exposes `/health` and `/predict`. The registered MLflow champion supplies the inference model.
+
+Retraining is disabled by default, and dry-run promotion never automatically replaces the champion.
 
 ## Dataset & Model Evaluation
 
@@ -223,17 +229,22 @@ Start each service in a separate terminal after Kafka, PostgreSQL, and MLflow ar
 
     curl http://127.0.0.1:8000/health
 
-### Run Tests
+### Verified Test Results
+
+Veyra has **145 passing automated tests**, verified in two separate runs:
+
+| Test suite | Passed | Deselected |
+|---|---:|---:|
+| Non-integration tests (GitHub Actions CI) | 142 | 3 |
+| PostgreSQL integration tests (local) | 3 | 142 |
+| **Total passing tests** | **145** | — |
+
+GitHub Actions runs the 142 non-integration tests automatically on pushes and pull requests.
+
+The 3 PostgreSQL integration tests were verified separately against the local database:
 
 ```bash
-python -m pytest tests/ -q
-```
-
-Latest verified test results:
-
-- 142 passed
-- 3 skipped
-- 219 warnings
+VEYRA_RUN_DB_TESTS=1 python -m pytest tests/ -q -m integration
 
 ### Run the Retraining Scheduler
 

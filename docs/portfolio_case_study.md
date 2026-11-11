@@ -67,7 +67,7 @@ BAF provides realistic application features, class imbalance, and temporal struc
 
 **Solution:** Added database integration tests, generated unique application IDs for demonstrations, inspected persisted prediction records, and separated test events from production monitoring data.
 
-**Outcome:** Achieved 142 passing automated tests, 2 passing database integration tests, and verified end-to-end prediction persistence.
+**Outcome:** 142 passing non-integration tests and 3 additional passing PostgreSQL integration tests (145 total).
 
 ### Engineering Takeaway
 
