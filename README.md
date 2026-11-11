@@ -1,3 +1,4 @@
+[![CI](https://github.com/ananyagullapally/veyra/actions/workflows/tests.yml/badge.svg)](https://github.com/ananyagullapally/veyra/actions/workflows/tests.yml)
 # Veyra — Real-Time Fraud Detection & MLOps Platform
 
 Veyra is an end-to-end fraud detection platform combining machine learning, real-time event streaming, model serving, monitoring, and retraining orchestration.
