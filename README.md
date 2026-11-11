@@ -31,7 +31,7 @@ Retraining is disabled by default. When enabled, the scheduled workflow checks p
 
 Model promotion remains dry-run only.
 
-See [Automated Retraining Documentation] (docs/automated_retraining.md).
+See [Automated Retraining Documentation](docs/automated_retraining.md).
 
 
 ## System Architecture
