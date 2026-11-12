@@ -37,34 +37,31 @@ See [Automated Retraining Documentation](docs/automated_retraining.md).
 ## System Architecture
 
 ```mermaid
+flowchart TD
+    A["Banking Application"] --> B["Kafka: Applications"]
+    B --> C["Scoring Consumer"]
+    C -->|"HTTP"| D["FastAPI + XGBoost"]
+    D -->|"Response"| C
+    C --> E["Kafka: Predictions"]
+    E --> F["Storage Consumer"]
+    F --> G[("PostgreSQL")]
 
-flowchart TB
-    subgraph SCORING["Real-Time Fraud Scoring"]
-        direction LR
-        A["Banking Application"] --> B["Kafka: veyra.applications"]
-        B --> C["Fraud Scoring Consumer"]
-        C -->|"HTTP request"| D["FastAPI /predict"]
-        D -->|"Prediction response"| C
-        C --> E["Kafka: veyra.predictions"]
-        E --> F["Prediction Storage Consumer"]
-        F --> G[("PostgreSQL")]
-    end
+    M["MLflow Champion"] --> D
 
-    M["MLflow Registry: Champion XGBoost"] --> D
+    G --> H["Prediction-Score PSI"]
+    H --> I{"Retraining enabled and triggered?"}
+    I -->|"Yes"| J["Lock + Cooldown"]
+    J --> K["Candidate Training + Evaluation"]
+    K --> L["Dry-Run Promotion"]
 
-    G --> H["Prediction-Score PSI Monitoring"]
-    H --> I{"Drift detected and retraining enabled?"}
-    I -->|"Yes"| J["PostgreSQL Lock + Cooldown"]
-    J --> K["Train XGBoost Candidate"]
-    K --> L["MLflow Candidate Evaluation"]
-    L --> N["Dry-Run Promotion: No Auto-Swap"]
+    classDef default fill:#e2e8f0,stroke:#334155,color:#0f172a,stroke-width:2px
+    classDef kafka fill:#bfdbfe,stroke:#2563eb,color:#172554
+    classDef database fill:#bbf7d0,stroke:#15803d,color:#14532d
+    classDef ml fill:#ddd6fe,stroke:#7c3aed,color:#3b0764
 
-    style SCORING fill:#f8fafc,stroke:#94a3b8
-    style B fill:#ede9fe,stroke:#8b5cf6
-    style E fill:#ede9fe,stroke:#8b5cf6
-    style G fill:#dcfce7,stroke:#16a34a
-    style M fill:#dbeafe,stroke:#3b82f6
-    style N fill:#fef3c7,stroke:#d97706
+    class B,E kafka
+    class G database
+    class D,M,K ml
 
 ```
 
