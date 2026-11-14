@@ -3,7 +3,7 @@
 ## Problem Statement
 Fraud detection requires more than training a machine learning model. A practical system must process application events, generate predictions, persist results reliably, monitor changing model behavior, and manage retraining safely.
 
-Veyra demonstrates an end-to-end, production-oriented fraud detection pipeline.
+Veyra demonstrates an end-to-end, production-style fraud detection pipeline.
 
 ## Dataset Selection
 The project uses the Bank Account Fraud (BAF) dataset containing 1 million privacy-preserving synthetic financial applications.
@@ -77,7 +77,7 @@ The central challenge was not simply training XGBoost. It was integrating data p
 - Processed 1,000,000 application records.
 - Built and verified the Kafka-to-PostgreSQL prediction pipeline.
 - Registered and served an XGBoost champion model.
-- Passed 142 automated tests and 2 database integration tests.
+- Passed 142 non-integration tests and 3 PostgreSQL integration tests (145 total).
 - Implemented PSI-based prediction-score monitoring and controlled retraining safeguards.
 
 ## Key Takeaway

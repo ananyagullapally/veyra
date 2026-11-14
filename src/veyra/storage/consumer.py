@@ -19,9 +19,15 @@ def run_storage_consumer():
             "VEYRA_KAFKA_BOOTSTRAP_SERVERS",
             "127.0.0.1:9092",
         ),
-        group_id="veyra-prediction-storage",
+        group_id=os.getenv(
+            "VEYRA_STORAGE_CONSUMER_GROUP",
+            "veyra-prediction-storage",
+        ),
         enable_auto_commit=False,
-        auto_offset_reset="earliest",
+        auto_offset_reset=os.getenv(
+            "VEYRA_STORAGE_OFFSET_RESET",
+            "earliest",
+        ),
     )
 
     logger.info("Prediction storage consumer started")

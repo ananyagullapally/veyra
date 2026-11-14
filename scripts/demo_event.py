@@ -22,7 +22,7 @@ application_id = f"demo-{uuid.uuid4().hex[:8]}"
 event = {
     "application_id": application_id,
     "features": payload["features"],
-    "source": "portfolio-demo",
+    "source": "synthetic_test",
 }
 
 producer = Producer({"bootstrap.servers": BOOTSTRAP})
