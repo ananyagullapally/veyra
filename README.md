@@ -3,6 +3,12 @@
 
 Veyra is an end-to-end fraud detection platform combining machine learning, real-time event streaming, model serving, monitoring, and retraining orchestration.
 
+## 🎥 Project Demo
+
+**[Watch the Full Veyra Demo](https://github.com/ananyagullapally/veyra/releases/tag/demo-v1)**
+
+A complete walkthrough of Veyra's architecture, XGBoost model evaluation, MLflow model registry, Kafka and FastAPI inference, PostgreSQL persistence, monitoring, retraining safeguards, and CI.
+
 ## Technology Stack
 
 - Python, XGBoost, scikit-learn
